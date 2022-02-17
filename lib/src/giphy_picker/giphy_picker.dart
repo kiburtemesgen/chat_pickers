@@ -1,12 +1,32 @@
+library giphy_picker;
+
 import 'dart:async';
+import 'package:chat_pickers/src/giphy_picker/src/model/client/type.dart';
 import 'package:flutter/material.dart';
-import 'package:giphy_client/giphy_client.dart';
+// import 'package:giphy_picker/src/model/giphy_client.dart';
+// import 'package:giphy_picker/src/model/giphy_decorator.dart';
+// import 'package:giphy_picker/src/model/giphy_preview_types.dart';
+// import 'package:giphy_picker/src/widgets/giphy_context.dart';
+// import 'package:giphy_picker/src/widgets/giphy_search_page.dart';
+
+// export 'package:giphy_picker/src/model/giphy_client.dart';
+// export 'package:giphy_picker/src/widgets/giphy_image.dart';
+// export 'package:giphy_picker/src/model/giphy_decorator.dart';
+// export 'package:giphy_picker/src/model/giphy_preview_types.dart';
+
+import 'src/model/giphy_client.dart';
+import 'src/model/giphy_decorator.dart';
+import 'src/model/giphy_preview_types.dart';
 import 'src/widgets/giphy_context.dart';
 import 'src/widgets/giphy_search_page.dart';
 import 'src/widgets/giphy_search_view.dart';
-import 'src/widgets/top_dialog.dart';
 
+export 'src/model/giphy_client.dart';
 export 'src/widgets/giphy_image.dart';
+export 'src/model/giphy_preview_types.dart';
+export 'src/widgets/giphy_context.dart';
+export 'src/widgets/giphy_search_page.dart';
+
 
 typedef ErrorListener = void Function(dynamic error);
 
@@ -18,63 +38,75 @@ class GiphyPicker {
     required String apiKey,
     String rating = GiphyRating.g,
     String lang = GiphyLanguage.english,
-//    Widget title,
+    bool sticker = false,
+    Widget? title,
     ErrorListener? onError,
     bool showPreviewPage = true,
+    GiphyDecorator? decorator,
+    bool fullScreenDialog = true,
     String searchText = 'Search GIPHY',
+    GiphyPreviewType? previewType,
   }) async {
     GiphyGif? result;
-
+    final _decorator = decorator ?? GiphyDecorator();
     await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (BuildContext context) => GiphyContext(
-                child: GiphySearchPage(),
-                apiKey: apiKey,
-                rating: rating,
-                language: lang,
-                onError: onError ?? (error) => _showErrorDialog(context, error),
-                onSelected: (gif) {
-                  result = gif;
-
-                  // pop preview page if necessary
-                  if (showPreviewPage) {
-                    Navigator.pop(context);
-                  }
-                  // pop giphy_picker
-                  Navigator.pop(context);
-                },
-                showPreviewPage: showPreviewPage,
-                searchText: searchText,
-              ),
-          fullscreenDialog: false),
+        builder: (BuildContext context) => GiphyContext(
+          decorator: _decorator,
+          previewType: previewType ?? GiphyPreviewType.previewGif,
+          child: GiphySearchPage(
+            title: title,
+          ),
+          apiKey: apiKey,
+          rating: rating,
+          language: lang,
+          sticker: sticker,
+          onError: onError ?? (error) => _showErrorDialog(context, error),
+          onSelected: (gif) {
+            result = gif;
+            // pop preview page if necessary
+            if (showPreviewPage) {
+              Navigator.pop(context);
+            }
+            // pop giphy_picker
+            Navigator.pop(context);
+          },
+          showPreviewPage: showPreviewPage,
+          searchText: searchText,
+        ),
+        fullscreenDialog: fullScreenDialog,
+      ),
     );
 
     return result;
   }
 
-  static Widget pickerGifWidget(
-      {required BuildContext context,
-      required String apiKey,
+    static Widget pickerGifWidget(
+      {required BuildContext? context,
+      required String? apiKey,
       String rating = GiphyRating.g,
       String lang = GiphyLanguage.english,
       Widget? title,
+      GiphyDecorator? decorator,
       Function? onClose,
       Function(GiphyGif)? onSelected}) {
+         final _decorator = decorator ?? GiphyDecorator();
     return SingleChildScrollView(
       child: GiphyContext(
+        decorator: _decorator,
         child: SafeArea(
             child: Container(
               width: 400,
               height: 280,
-              child: GiphySearchView(onClose: onClose),
+              child: GiphySearchView( type: GiphyType.gifs,),
               color: Colors.white,
             ),
             bottom: false),
-        apiKey: apiKey,
+        apiKey: apiKey!,
         rating: rating,
         language: lang,
-        onError: (error) => _showErrorDialog(context, error),
+        onError: (error) => _showErrorDialog(context!, error),
         onSelected: onSelected,
         showPreviewPage: false,
 //      searchText: searchText,
@@ -82,61 +114,68 @@ class GiphyPicker {
     );
   }
 
-  static Future<GiphyGif?> pickGifSmallScreen({
-    required BuildContext context,
-    required String apiKey,
-    String rating = GiphyRating.g,
-    String lang = GiphyLanguage.english,
-    Widget? title,
-    ErrorListener? onError,
-    bool showPreviewPage = true,
-    String searchText = 'Search GIPHY',
-  }) async {
-    GiphyGif? result;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        // todo: using BottomDialog instead
-        return PositionedDialog(
-          //contentPadding: const EdgeInsets.all(4),
-          position: DialogPosition.BOTTOM,
-          //title: Text('Giphy Search', style: TextStyle(fontWeight: FontWeight.bold),),
-          content: GiphyContext(
-            child: SafeArea(
-                child: Container(
-                    width: 400, height: 500, child: GiphySearchView()),
-                bottom: false),
-            apiKey: apiKey,
-            rating: rating,
-            language: lang,
-            onError: onError ?? (error) => _showErrorDialog(context, error),
-            onSelected: (gif) {
-              result = gif;
-
-              // pop preview page if necessary
-              if (showPreviewPage) {
-                Navigator.pop(context);
-              }
-              // pop giphy_picker
-              Navigator.pop(context);
-            },
-            showPreviewPage: showPreviewPage,
-            searchText: searchText,
-          ),
-          actions: <Widget>[
-            new FlatButton(
-              child: new Text("Close"),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+  static Widget pickerStickerWidget(
+      {required BuildContext? context,
+      required String? apiKey,
+      String rating = GiphyRating.g,
+      String lang = GiphyLanguage.english,
+      Widget? title,
+      GiphyDecorator? decorator,
+      Function? onClose,
+      Function(GiphyGif)? onSelected}) {
+         final _decorator = decorator ?? GiphyDecorator();
+    return SingleChildScrollView(
+      child: GiphyContext(
+        decorator: _decorator,
+        child: SafeArea(
+            child: Container(
+              width: 400,
+              height: 280,
+              child: GiphySearchView( type: GiphyType.stickers,),
+              color: Colors.white,
             ),
-          ],
-        );
-      },
+            bottom: false),
+        apiKey: apiKey!,
+        rating: rating,
+        language: lang,
+        onError: (error) => _showErrorDialog(context!, error),
+        onSelected: onSelected,
+        showPreviewPage: false,
+//      searchText: searchText,
+      ),
     );
+  }
 
-    return result;
+     static Widget pickerAnimatedWidget(
+      {required BuildContext? context,
+      required String? apiKey,
+      String rating = GiphyRating.g,
+      String lang = GiphyLanguage.english,
+      Widget? title,
+      GiphyDecorator? decorator,
+      Function? onClose,
+      Function(GiphyGif)? onSelected}) {
+         final _decorator = decorator ?? GiphyDecorator();
+    return SingleChildScrollView(
+      child: GiphyContext(
+        decorator: _decorator,
+        child: SafeArea(
+            child: Container(
+              width: 400,
+              height: 280,
+              child: GiphySearchView(type: GiphyType.emoji,),
+              color: Colors.white,
+            ),
+            bottom: false),
+        apiKey: apiKey!,
+        rating: rating,
+        language: lang,
+        onError: (error) => _showErrorDialog(context!, error),
+        onSelected: onSelected,
+        showPreviewPage: false,
+//      searchText: searchText,
+      ),
+    );
   }
 
   static void _showErrorDialog(BuildContext context, dynamic error) {
@@ -144,11 +183,11 @@ class GiphyPicker {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: new Text('Giphy error'),
-          content: new Text('An error occurred. $error'),
+          title: Text('Giphy error'),
+          content: Text('An error occurred. $error'),
           actions: <Widget>[
-            new FlatButton(
-              child: new Text("Close"),
+            TextButton(
+              child: Text("Close"),
               onPressed: () {
                 Navigator.of(context).pop();
               },

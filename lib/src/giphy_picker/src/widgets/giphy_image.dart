@@ -1,13 +1,17 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+// import 'package:http/http.dart';
+// import 'package:giphy_picker/src/model/giphy_client.dart';
+// import 'package:giphy_picker/src/widgets/giphy_overlay.dart';
+
+import '../model/giphy_client.dart';
+import '../widgets/giphy_overlay.dart';
+// import '../../../http/lib/http.dart';
 import 'package:http/http.dart';
-import 'package:giphy_client/giphy_client.dart';
-import '../../src/widgets/giphy_overlay.dart';
 
 /// Loads and renders a Giphy image.
 class GiphyImage extends StatefulWidget {
-  final String url;
+  final String? url;
   final Widget? placeholder;
   final double? width;
   final double? height;
@@ -17,7 +21,7 @@ class GiphyImage extends StatefulWidget {
   /// Loads an image from given url.
   const GiphyImage(
       {Key? key,
-      required this.url,
+      this.url,
       this.placeholder,
       this.width,
       this.height,
@@ -34,8 +38,8 @@ class GiphyImage extends StatefulWidget {
       this.height,
       this.fit,
       this.renderGiphyOverlay = true})
-      : url = gif.images?.original?.url ?? "",
-        super(key: key ?? Key(gif.id ?? "0"));
+      : url = gif.images.original?.url,
+        super(key: key ?? Key(gif.id));
 
   /// Loads the original still image for given Giphy gif.
   GiphyImage.originalStill(
@@ -46,28 +50,29 @@ class GiphyImage extends StatefulWidget {
       this.height,
       this.fit,
       this.renderGiphyOverlay = true})
-      : url = gif.images?.originalStill?.url ?? "",
-        super(key: key ?? Key(gif.id ?? ""));
+      : url = gif.images.originalStill?.url,
+        super(key: key ?? Key(gif.id));
 
   @override
   _GiphyImageState createState() => _GiphyImageState();
 
   /// Loads the images bytes for given url from Giphy.
   static Future<Uint8List?> load(String? url, {Client? client}) async {
-    if(url != null) {
-      final response =
-      await (client ?? Client()).get(Uri.parse(url), headers: {'accept': 'image/*'});
+    if (url == null) {
+      return null;
+    }
+    final response = await (client ?? Client())
+        .get(Uri.parse(url), headers: {'accept': 'image/*'});
 
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      }
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
     }
     return null;
   }
 }
 
 class _GiphyImageState extends State<GiphyImage> {
-  Future<Uint8List?>? _loadImage;
+  late Future<Uint8List?> _loadImage;
 
   @override
   void initState() {

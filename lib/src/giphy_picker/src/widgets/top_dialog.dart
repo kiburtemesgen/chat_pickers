@@ -97,7 +97,7 @@ class PositionedDialog extends StatelessWidget {
         ),
       );
 
-    AlignmentGeometry? alignment;
+    AlignmentGeometry alignment;
     switch (position) {
       case DialogPosition.TOP:
         alignment = Alignment.topCenter;
@@ -133,16 +133,14 @@ class PositionedDialog extends StatelessWidget {
                     shape: shape ?? dialogTheme.shape ?? _defaultDialogShape,
                     type: MaterialType.card,
                     child: Column(
-                      // todo: fix this
-                    //   children: <Widget>[
-                    //     Container(
-                    //             child: title,
-                    //             margin: const EdgeInsets.only(
-                    //                 top: 10, bottom: 18)) ??
-                    //         Container(),
-                    //     content,
-                    //     actionsWidget ?? Container()
-                    //   ]) as List<Widget>,
+                      children: <Widget>[
+                        Container(
+                                child: title,
+                                margin: const EdgeInsets.only(
+                                    top: 10, bottom: 18)) ?? Container(),
+                        content!,
+                        actionsWidget ?? Container()
+                      ],
                     )),
               ),
             ],

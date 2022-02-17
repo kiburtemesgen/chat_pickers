@@ -9,7 +9,7 @@ class GiphyOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(children: <Widget>[
-      child ?? Container(),
+      if (child != null) child!,
       Positioned(
           left: 0,
           right: 0,

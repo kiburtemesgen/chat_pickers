@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:giphy_client/giphy_client.dart';
-import '../../src/model/giphy_repository.dart';
-import '../../src/widgets/giphy_context.dart';
-import '../../src/widgets/giphy_preview_page.dart';
-import '../../src/widgets/giphy_thumbnail.dart';
+// import 'package:giphy_picker/src/model/giphy_repository.dart';
+// import 'package:giphy_picker/src/widgets/giphy_context.dart';
+// import 'package:giphy_picker/src/widgets/giphy_preview_page.dart';
+// import 'package:giphy_picker/src/widgets/giphy_thumbnail.dart';
+
+import '../model/giphy_repository.dart';
+import '../widgets/giphy_context.dart';
+import '../widgets/giphy_preview_page.dart';
+import '../widgets/giphy_thumbnail.dart';
 
 /// A selectable grid view of gif thumbnails.
 class GiphyThumbnailGrid extends StatelessWidget {
-  final GiphyRepository? repo;
+  final GiphyRepository repo;
   final ScrollController? scrollController;
 
   const GiphyThumbnailGrid(
@@ -19,26 +23,28 @@ class GiphyThumbnailGrid extends StatelessWidget {
     return GridView.builder(
         padding: EdgeInsets.all(10),
         controller: scrollController,
-        itemCount: repo!.totalCount,
+        itemCount: repo.totalCount,
         itemBuilder: (BuildContext context, int index) => GestureDetector(
             child: GiphyThumbnail(key: Key('$index'), repo: repo, index: index),
             onTap: () async {
               // display preview page
               final giphy = GiphyContext.of(context);
-              final GiphyGif? gif = await repo!.get(index);
+              final gif = await repo.get(index);
               if (giphy.showPreviewPage) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (BuildContext context) => GiphyPreviewPage(
-                      gif: gif ?? GiphyGif(),
-                      onSelected: giphy.onSelected,
+                    builder: (BuildContext context) => Theme(
+                      data: giphy.decorator.giphyTheme ?? Theme.of(context),
+                      child: GiphyPreviewPage(
+                        gif: gif,
+                        onSelected: giphy.onSelected,
+                      ),
                     ),
                   ),
                 );
               } else {
-                if(gif != null)
-                  giphy.onSelected!(gif);
+                giphy.onSelected?.call(gif);
               }
             }),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

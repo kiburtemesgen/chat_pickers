@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:giphy_client/giphy_client.dart';
-import '../../src/widgets/giphy_image.dart';
+// import 'package:giphy_picker/src/model/giphy_client.dart';
+// import 'package:giphy_picker/src/widgets/giphy_image.dart';
+import '../widgets/giphy_image.dart';
+import '../model/giphy_client.dart';
 
 /// Presents a Giphy preview image.
 class GiphyPreviewPage extends StatelessWidget {
@@ -17,7 +19,8 @@ class GiphyPreviewPage extends StatelessWidget {
 
     return Scaffold(
         appBar: AppBar(title: title, actions: <Widget>[
-          IconButton(icon: Icon(Icons.check), onPressed: () => onSelected!(gif))
+          IconButton(
+              icon: Icon(Icons.check), onPressed: () => onSelected?.call(gif))
         ]),
         body: SafeArea(
             child: Center(

@@ -1,49 +1,58 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:typed_data';
+// import 'package:giphy_picker/src/model/giphy_client.dart';
+// import 'package:giphy_picker/src/model/giphy_preview_types.dart';
+// import 'package:giphy_picker/src/model/repository.dart';
+// import 'package:giphy_picker/giphy_picker.dart';
+// import 'package:http/http.dart' as http;
 
-import 'package:flutter/foundation.dart';
-import 'package:giphy_client/giphy_client.dart';
-import '../../src/model/repository.dart';
+import 'package:chat_pickers/src/giphy_picker/src/model/client/type.dart';
+
+import '../model/giphy_client.dart';
+import '../model/giphy_preview_types.dart';
+import '../model/repository.dart';
 import '../../giphy_picker.dart';
+// import '../../../http/lib/http.dart' as http;
 import 'package:http/http.dart' as http;
 
-typedef Future<GiphyCollection>? GetCollection(
-    GiphyClient? client, int offset, int limit);
+typedef Future<GiphyCollection> GetCollection(
+    GiphyClient client, int offset, int limit);
 
 /// Retrieves and caches gif collections from Giphy.
-class GiphyRepository extends Repository<GiphyGif?> {
+class GiphyRepository extends Repository<GiphyGif> {
   final _client = http.Client();
-  final _previewCompleters = HashMap<int, Completer<Uint8List>>();
+  final _previewCompleters = HashMap<int, Completer<Uint8List?>>();
   final _previewQueue = Queue<int>();
   final GetCollection getCollection;
   final int maxConcurrentPreviewLoad;
-  GiphyClient? _giphyClient;
+  late GiphyClient _giphyClient;
   int _previewLoad = 0;
+  final GiphyPreviewType? previewType;
 
-  GiphyRepository(
-      {required String apiKey,
-      required this.getCollection,
-      this.maxConcurrentPreviewLoad = 4,
-      int pageSize = 25,
-      ErrorListener? onError})
-      : super(pageSize: pageSize, onError: onError) {
+  GiphyRepository({
+    required String apiKey,
+    required this.getCollection,
+    this.maxConcurrentPreviewLoad = 4,
+    int pageSize = 25,
+    ErrorListener? onError,
+    this.previewType,
+  }) : super(pageSize: pageSize, onError: onError!) {
     _giphyClient = GiphyClient(apiKey: apiKey, client: _client);
   }
 
   /// Retrieves specified page of gif data from Giphy.
-  Future<Page<GiphyGif?>> getPage(int page) async {
-    final offset = page * pageSize!;
-    final collection = await getCollection(_giphyClient, offset, pageSize ?? 0);
-    return Page(collection?.data ?? [], page, collection?.pagination?.totalCount ?? 0);
+  Future<Page<GiphyGif>> getPage(int page) async {
+    final offset = page * pageSize;
+    final collection = await getCollection(_giphyClient, offset, pageSize);
+    return Page(collection.data, page, collection.pagination?.totalCount ?? 0);
   }
 
   /// Retrieves a preview Gif image at specified index.
-  Future<Uint8List> getPreview(int index) async {
-
+  Future<Uint8List?> getPreview(int index) async {
     var completer = _previewCompleters[index];
     if (completer == null) {
-      completer = Completer<Uint8List>();
+      completer = Completer<Uint8List?>();
       _previewCompleters[index] = completer;
       _previewQueue.add(index);
 
@@ -56,8 +65,6 @@ class GiphyRepository extends Repository<GiphyGif?> {
 
   /// Cancels retrieving specified preview image, by removing it from the queue.
   void cancelGetPreview(int index) {
-    assert(index != null);
-
     final completer = _previewCompleters.remove(index);
     if (completer != null) {
       // remove from queue
@@ -91,13 +98,42 @@ class GiphyRepository extends Repository<GiphyGif?> {
     }
   }
 
-  Future<Uint8List?> _loadPreviewImage(GiphyGif? gif) async {
-    if(gif == null)
-      return null;
-
+  Future<Uint8List?> _loadPreviewImage(GiphyGif gif) async {
     // fallback to still image if preview is empty
-    final url =
-        gif.images?.previewGif?.url ?? gif.images?.fixedWidthSmallStill?.url;
+    String? url;
+    switch (previewType) {
+      case GiphyPreviewType.fixedWidthSmallStill:
+        url = gif.images.fixedWidthSmallStill?.url;
+        break;
+      case GiphyPreviewType.previewGif:
+        url = gif.images.previewGif?.url;
+        break;
+      case GiphyPreviewType.fixedHeight:
+        url = gif.images.fixedHeight?.url;
+        break;
+      case GiphyPreviewType.original:
+        url = gif.images.original?.url;
+        break;
+      case GiphyPreviewType.previewWebp:
+        url = gif.images.previewWebp?.url;
+        break;
+      case GiphyPreviewType.downsizedLarge:
+        url = gif.images.downsizedLarge?.url;
+        break;
+      case GiphyPreviewType.originalStill:
+        url = gif.images.originalStill?.url;
+        break;
+      default:
+        url = null;
+        break;
+    }
+    if (url == null) {
+      url = gif.images.previewGif?.url ??
+          gif.images.fixedWidthSmallStill?.url ??
+          gif.images.fixedHeightDownsampled?.url ??
+          gif.images.original?.url;
+    }
+
     if (url != null) {
       return await GiphyImage.load(url, client: _client);
     }
@@ -106,15 +142,19 @@ class GiphyRepository extends Repository<GiphyGif?> {
   }
 
   /// The repository of trending gif images.
-  static Future<GiphyRepository> trending(
-      {required String apiKey,
-      String rating = GiphyRating.g,
-      ErrorListener? onError}) async {
+  static Future<GiphyRepository> trending({
+    required String apiKey,
+    String rating = GiphyRating.g,
+    bool sticker = false,
+    String type = GiphyType.gifs,
+    ErrorListener? onError,
+    GiphyPreviewType? previewType,
+  }) async {
     final repo = GiphyRepository(
         apiKey: apiKey,
-        getCollection: (client, offset, limit) {
-          client?.trending(offset: offset, limit: limit, rating: rating);
-        },
+        previewType: previewType,
+        getCollection: (client, offset, limit) => client.trending(
+            offset: offset, limit: limit, rating: rating, sticker: sticker, type: type),
         onError: onError);
 
     // retrieve first page
@@ -129,11 +169,18 @@ class GiphyRepository extends Repository<GiphyGif?> {
       required String query,
       String rating = GiphyRating.g,
       String lang = GiphyLanguage.english,
+      bool sticker = false,
+      GiphyPreviewType? previewType,
       ErrorListener? onError}) async {
     final repo = GiphyRepository(
         apiKey: apiKey,
-        getCollection: (client, offset, limit) => client?.search(query,
-            offset: offset, limit: limit, rating: rating, lang: lang),
+        previewType: previewType,
+        getCollection: (client, offset, limit) => client.search(query,
+            offset: offset,
+            limit: limit,
+            rating: rating,
+            lang: lang,
+            sticker: sticker),
         onError: onError);
 
     // retrieve first page

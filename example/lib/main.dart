@@ -3,7 +3,7 @@ import 'package:chat_pickers/chat_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:giphy_client/giphy_client.dart';
+// import 'package:giphy_client/giphy_client.dart';
 // import 'package:image_ink_well/image_ink_well.dart';
 import 'package:mobx/mobx.dart';
 import 'package:provider/provider.dart';
@@ -704,7 +704,7 @@ class _HomeScreenState extends State<HomeScreen>  with SingleTickerProviderState
   void _addGifMessage(GiphyGif gif) {
     PhotoMessage message = PhotoMessage(
       isGif: true,
-      url: gif.images?.original?.url ?? "",
+      url: gif.images.original!.url ?? "",
       senderId: widget.myUid,
       time: DateTime.now(),
     );

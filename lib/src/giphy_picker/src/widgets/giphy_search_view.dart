@@ -1,16 +1,19 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-import '../../src/model/giphy_repository.dart';
-import '../../src/widgets/giphy_context.dart';
-import '../../src/widgets/giphy_thumbnail_grid.dart';
+// import 'package:giphy_picker/src/model/giphy_repository.dart';
+// import 'package:giphy_picker/src/utils/debouncer.dart';
+// import 'package:giphy_picker/src/widgets/giphy_context.dart';
+// import 'package:giphy_picker/src/widgets/giphy_thumbnail_grid.dart';
+
+import '../model/giphy_repository.dart';
+import '../utils/debouncer.dart';
+import '../widgets/giphy_context.dart';
+import '../widgets/giphy_thumbnail_grid.dart';
 
 /// Provides the UI for searching Giphy gif images.
 class GiphySearchView extends StatefulWidget {
-  final Function? onClose;
-
-  const GiphySearchView({Key? key, this.onClose}) : super(key: key);
-
+  final String type;
+  GiphySearchView({required this.type});
   @override
   _GiphySearchViewState createState() => _GiphySearchViewState();
 }
@@ -19,41 +22,59 @@ class _GiphySearchViewState extends State<GiphySearchView> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final _repoController = StreamController<GiphyRepository>();
+  late Debouncer _debouncer;
 
   @override
   void initState() {
     // initiate search on next frame (we need context)
-    Future.delayed(Duration.zero, () {
+    WidgetsBinding.instance?.addPostFrameCallback((_) {
       final giphy = GiphyContext.of(context);
+      _debouncer = Debouncer(
+        delay: giphy.searchDelay,
+      );
       _search(giphy);
     });
-
     super.initState();
   }
 
   @override
   void dispose() {
     _repoController.close();
+    _debouncer.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final giphy = GiphyContext.of(context);
+    final giphyDecorator = giphy.decorator;
+
+    final inputDecoration = InputDecoration(
+      hintText: giphy.searchText,
+    );
+    if (giphyDecorator.giphyTheme != null) {
+      inputDecoration
+          .applyDefaults(giphyDecorator.giphyTheme!.inputDecorationTheme);
+    }
 
     return Column(children: <Widget>[
-      Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10),
-        child: TextField(
-          controller: _textController,
-          decoration: InputDecoration(
-            hintText: giphy.searchText,
-            suffixIcon: IconButton(
-              icon: Icon(Icons.keyboard),
-              onPressed: widget.onClose as void Function()?,
+      Material(
+        elevation: giphyDecorator.searchElevation,
+        color: giphyDecorator.giphyTheme?.scaffoldBackgroundColor,
+        child: Row(
+          children: [
+            if (!giphyDecorator.showAppBar) BackButton(),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: TextField(
+                  controller: _textController,
+                  decoration: inputDecoration,
+                  onChanged: (value) => _delayedSearch(giphy, value),
+                ),
+              ),
             ),
-          ),
-          onChanged: (value) => _delayedSearch(giphy, value),
+          ],
         ),
       ),
       Expanded(
@@ -62,16 +83,16 @@ class _GiphySearchViewState extends State<GiphySearchView> {
               builder: (BuildContext context,
                   AsyncSnapshot<GiphyRepository> snapshot) {
                 if (snapshot.hasData) {
-                  return snapshot.data!.totalCount! > 0
+                  return snapshot.data!.totalCount > 0
                       ? NotificationListener(
                           child: RefreshIndicator(
                               child: GiphyThumbnailGrid(
                                   key: Key('${snapshot.data.hashCode}'),
-                                  repo: snapshot.data,
+                                  repo: snapshot.data!,
                                   scrollController: _scrollController),
                               onRefresh: () =>
                                   _search(giphy, term: _textController.text)),
-                          onNotification: (dynamic n) {
+                          onNotification: (n) {
                             // hide keyboard when scrolling
                             if (n is UserScrollNotification) {
                               FocusScope.of(context).requestFocus(FocusNode());
@@ -89,8 +110,8 @@ class _GiphySearchViewState extends State<GiphySearchView> {
     ]);
   }
 
-  void _delayedSearch(GiphyContext giphy, String term) => Future.delayed(
-      Duration(milliseconds: 500), () => _search(giphy, term: term));
+  void _delayedSearch(GiphyContext giphy, String term) =>
+      _debouncer.call(() => _search(giphy, term: term));
 
   Future _search(GiphyContext giphy, {String term = ''}) async {
     // skip search if term does not match current search text
@@ -104,22 +125,32 @@ class _GiphySearchViewState extends State<GiphySearchView> {
           ? GiphyRepository.trending(
               apiKey: giphy.apiKey,
               rating: giphy.rating,
+              sticker: giphy.sticker,
+              type: widget.type,
+              previewType: giphy.previewType,
               onError: giphy.onError)
           : GiphyRepository.search(
               apiKey: giphy.apiKey,
               query: term,
               rating: giphy.rating,
               lang: giphy.language,
-              onError: giphy.onError));
+              sticker: giphy.sticker,
+              previewType: giphy.previewType,
+              onError: giphy.onError,
+            ));
 
       // scroll up
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0);
       }
-      _repoController.add(repo);
+      if (mounted) {
+        _repoController.add(repo);
+      }
     } catch (error) {
-      _repoController.addError(error);
-      giphy.onError!(error);
+      if (mounted) {
+        _repoController.addError(error);
+      }
+      giphy.onError?.call(error);
     }
   }
 }
